@@ -2,8 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const SpotifyDatabase = require('./../database/sqlite-repo');
 const ListeningTracker = require('./tracker');
-const { open } = require('sqlite');
-const sqlite3 = require('sqlite3');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,22 +11,50 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Simple file-based storage for the cloud server
+const tokenFile = path.join(__dirname, 'token.json');
+const cloudStorage = {
+    async getToken(key) {
+        try {
+            if (!fs.existsSync(tokenFile)) return null;
+            const data = JSON.parse(fs.readFileSync(tokenFile, 'utf8'));
+            return data[key] || null;
+        } catch (e) { return null; }
+    },
+    async setToken(key, value) {
+        try {
+            let data = {};
+            if (fs.existsSync(tokenFile)) {
+                data = JSON.parse(fs.readFileSync(tokenFile, 'utf8'));
+            }
+            data[key] = value;
+            fs.writeFileSync(tokenFile, JSON.stringify(data));
+        } catch (e) { console.error('[Storage Error]', e); }
+    }
+};
+
 const dbRepo = new SpotifyDatabase();
 
 async function startServer() {
-    // Initialize DB
     await dbRepo.init();
     
-    // Start the background tracker
-    const tracker = new ListeningTracker(dbRepo);
+    // Pass both dbRepo AND cloudStorage to the tracker
+    const tracker = new ListeningTracker(dbRepo, cloudStorage);
     tracker.start();
     console.log('[Cloud Server] Listening Tracker started in background...');
 
-    // API Endpoint for the Dashboard
+    app.post('/sync-token', async (req, res) => {
+        const { access_token, expires_at } = req.body;
+        if (!access_token) return res.status(400).json({ error: 'Missing token' });
+        
+        await cloudStorage.setToken('access_token', access_token);
+        await cloudStorage.setToken('expires_at', expires_at);
+        
+        res.json({ status: 'Token synced successfully' });
+    });
+
     app.get('/stats', async (req, res) => {
         try {
-            // Re-using the logic from the StatisticsEngine
-            // We can implement a simple version of it here
             const totalTime = await dbRepo.db.get('SELECT SUM(duration_ms) as total FROM listening_sessions');
             const topTracks = await dbRepo.db.all(`
                 SELECT track_id as id, track_name as name, SUM(duration_ms) as duration 
