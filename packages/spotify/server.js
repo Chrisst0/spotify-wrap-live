@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const SpotifyClient = require('./client');
 const SpotifyDatabase = require('./../database/sqlite-repo');
 const ListeningTracker = require('./tracker');
 const fs = require('fs');
@@ -34,12 +35,13 @@ const cloudStorage = {
 };
 
 const dbRepo = new SpotifyDatabase();
+const spotifyClient = new SpotifyClient();
 
 async function startServer() {
     await dbRepo.init();
     
-    // Pass both dbRepo AND cloudStorage to the tracker
-    const tracker = new ListeningTracker(dbRepo, cloudStorage);
+    // Corrected constructor: (client, db, storage)
+    const tracker = new ListeningTracker(spotifyClient, dbRepo, cloudStorage);
     tracker.start();
     console.log('[Cloud Server] Listening Tracker started in background...');
 
