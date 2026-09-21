@@ -106,29 +106,46 @@ async function startServer() {
     app.get('/current', async (req, res) => {
         try {
             const token = await cloudStorage.getToken('access_token');
-            if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
-            const state = await spotifyClient.getCurrentPlayback(token);
-            if (!state.track) {
-                return res.json({ isPlaying: false });
+            if (!token) {
+                console.error('[API Error] No access token found for /current');
+                return res.status(401).json({ error: 'Unauthorized: No token found' });
             }
 
-            const trackData = await spotifyClient.request(`/tracks/${state.track.id}`, token);
-            
-            res.json({
-                isPlaying: state.isPlaying,
-                track: {
-                    id: state.track.id,
-                    name: trackData.name,
-                    artist: trackData.artists[0]?.name,
-                    albumArt: trackData.album.images?.[0]?.url,
-                    progress_ms: state.progress_ms,
-                    duration_ms: state.track.duration_ms
-                }
-            });
+            const state = await spotifyClient.getCurrentPlayback(token);
+            if (!state || !state.track) {
+                return res.json({ isPlaying: false, track: null });
+            }
+
+            try {
+                const trackData = await spotifyClient.request(`/tracks/${state.track.id}`, token);
+                res.json({
+                    isPlaying: state.isPlaying,
+                    track: {
+                        id: state.track.id,
+                        name: trackData.name,
+                        artist: trackData.artists?.[0]?.name || 'Unknown Artist',
+                        albumArt: trackData.album?.images?.[0]?.url || null,
+                        progress_ms: state.progress_ms,
+                        duration_ms: state.track.duration_ms
+                    }
+                });
+            } catch (trackErr) {
+                console.error(`[API Error] Failed to fetch track details for ${state.track.id}:`, trackErr);
+                res.json({
+                    isPlaying: state.isPlaying,
+                    track: {
+                        id: state.track.id,
+                        name: state.track.name || 'Unknown Track',
+                        artist: 'Unknown Artist',
+                        albumArt: null,
+                        progress_ms: state.progress_ms,
+                        duration_ms: state.track.duration_ms
+                    }
+                });
+            }
         } catch (e) {
-            console.error('[API Error] /current:', e);
-            res.status(500).json({ error: 'Failed to fetch current track' });
+            console.error('[API Error] /current critical failure:', e);
+            res.status(500).json({ error: 'Internal Server Error', details: e.message });
         }
     });
 
