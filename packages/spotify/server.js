@@ -185,9 +185,8 @@ async function startServer() {
                         info = info || { name: `Unknown Artist`, genres: [], image: null };
                     }
                 }
-                artist.name = info.name;
-                artist.image = info.image;
-                artist.genres = info.genres;
+                // Store info on a separate property to avoid SQLite read-only issues
+                artist.meta = info;
             }));
 
             // Aggregate genres and prepare final artist list
@@ -195,15 +194,16 @@ async function startServer() {
             const artistsWithNames = [];
 
             for (const artist of topArtists) {
+                const info = artist.meta || { name: 'Unknown Artist', image: null, genres: [] };
                 artistsWithNames.push({
                     id: artist.id,
-                    name: artist.name,
-                    image: artist.image,
+                    name: info.name,
+                    image: info.image,
                     duration: artist.duration
                 });
 
-                if (artist.genres) {
-                    artist.genres.forEach(g => {
+                if (info.genres) {
+                    info.genres.forEach(g => {
                         genreCounts[g] = (genreCounts[g] || 0) + 1;
                     });
                 }
