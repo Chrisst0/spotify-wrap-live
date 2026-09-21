@@ -139,7 +139,7 @@ async function startServer() {
             const totalTracks = await dbRepo.db.get('SELECT COUNT(DISTINCT track_id) as count FROM listening_sessions');
             const totalArtists = await dbRepo.db.get('SELECT COUNT(DISTINCT artist_id) as count FROM session_artists');
 
-            const topTracks = await dbRepo.db.all(`
+            const rawTopTracks = await dbRepo.db.all(`
                 SELECT track_id as id, track_name as name, SUM(duration_ms) as duration 
                 FROM listening_sessions 
                 GROUP BY track_id 
@@ -147,8 +147,8 @@ async function startServer() {
                 LIMIT 10
             `);
 
-            // Fetch and cache album art for top tracks in parallel
-            await Promise.all(topTracks.map(async (track) => {
+            // Fetch and cache album art for top tracks in parallel, creating fresh objects
+            const topTracks = await Promise.all(rawTopTracks.map(async (track) => {
                 let info = await dbRepo.getTrackInfo(track.id);
                 if (!info) {
                     try {
@@ -163,13 +163,18 @@ async function startServer() {
                         info = { name: track.name, image: null };
                     }
                 }
-                track.image = info.image;
+                return {
+                    id: track.id,
+                    name: info.name || track.name,
+                    duration: track.duration,
+                    image: info.image
+                };
             }));
 
-            const topArtists = await dbRepo.getTopArtists(10);
+            const rawTopArtists = await dbRepo.getTopArtists(10);
             
-            // Fetch names, genres, and images for top artists in parallel
-            await Promise.all(topArtists.map(async (artist) => {
+            // Fetch names, genres, and images for top artists in parallel, creating fresh objects
+            const topArtists = await Promise.all(rawTopArtists.map(async (artist) => {
                 let info = await dbRepo.getArtistInfo(artist.id);
                 if (!info || info.name === 'Unknown Artist') {
                     try {
@@ -185,8 +190,13 @@ async function startServer() {
                         info = info || { name: `Unknown Artist`, genres: [], image: null };
                     }
                 }
-                // Store info on a separate property to avoid SQLite read-only issues
-                artist.meta = info;
+                return {
+                    id: artist.id,
+                    name: info.name,
+                    image: info.image,
+                    duration: artist.duration,
+                    genres: info.genres
+                };
             }));
 
             // Aggregate genres and prepare final artist list
@@ -194,16 +204,15 @@ async function startServer() {
             const artistsWithNames = [];
 
             for (const artist of topArtists) {
-                const info = artist.meta || { name: 'Unknown Artist', image: null, genres: [] };
                 artistsWithNames.push({
                     id: artist.id,
-                    name: info.name,
-                    image: info.image,
+                    name: artist.name,
+                    image: artist.image,
                     duration: artist.duration
                 });
 
-                if (info.genres) {
-                    info.genres.forEach(g => {
+                if (artist.genres) {
+                    artist.genres.forEach(g => {
                         genreCounts[g] = (genreCounts[g] || 0) + 1;
                     });
                 }
