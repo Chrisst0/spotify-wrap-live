@@ -176,7 +176,10 @@ export default function App() {
               <LineChart data={stats.activity}>
                 <XAxis dataKey="day" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis hide />
-                <Tooltip contentStyle={{ backgroundColor: '#18181b', border: 'none', borderRadius: '8px', color: '#fff' }} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#18181b', border: 'none', borderRadius: '8px', color: '#fff' }} 
+                  formatter={(value) => [formatMs(Number(value)), 'Duration']}
+                />
                 <Line type="monotone" dataKey="duration" stroke="#22c55e" strokeWidth={3} dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -216,7 +219,7 @@ export default function App() {
                 </div>
               </>
             ) : (
-              <p className="text-zinc-500 text-sm italic">Collecting genre data...</p>
+              <p className="text-zinc-500 text-sm italic">{stats.topArtists?.length > 0 ? 'No genre data available' : 'Collecting genre data...'}</p>
             )}
           </div>
         </div>
