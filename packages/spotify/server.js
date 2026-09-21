@@ -174,7 +174,9 @@ async function startServer() {
 
             for (const artist of topArtists) {
                 let info = await dbRepo.getArtistInfo(artist.id);
-                if (!info) {
+                
+                // If info is missing or name is "Unknown Artist", try to refresh from Spotify
+                if (!info || info.name === 'Unknown Artist') {
                     try {
                         const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
                         info = { 
@@ -184,8 +186,8 @@ async function startServer() {
                         };
                         await dbRepo.saveArtistInfo(artist.id, info.name, info.genres, info.image);
                     } catch (e) {
-                        console.error(`Failed to fetch info for ${artist.id}:`, e);
-                        info = { name: `Unknown Artist`, genres: [], image: null };
+                        console.error(`Failed to refresh info for ${artist.id}:`, e);
+                        info = info || { name: `Unknown Artist`, genres: [], image: null };
                     }
                 }
                 
@@ -196,9 +198,11 @@ async function startServer() {
                     duration: artist.duration
                 });
 
-                info.genres.forEach(g => {
-                    genreCounts[g] = (genreCounts[g] || 0) + 1;
-                });
+                if (info.genres) {
+                    info.genres.forEach(g => {
+                        genreCounts[g] = (genreCounts[g] || 0) + 1;
+                    });
+                }
             }
 
             const topGenres = Object.entries(genreCounts)
