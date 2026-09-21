@@ -106,6 +106,7 @@ async function startServer() {
     app.get('/stats', async (req, res) => {
         try {
             const totalTime = await dbRepo.db.get('SELECT SUM(duration_ms) as total FROM listening_sessions');
+            
             const topTracks = await dbRepo.db.all(`
                 SELECT track_id as id, track_name as name, SUM(duration_ms) as duration 
                 FROM listening_sessions 
@@ -113,6 +114,33 @@ async function startServer() {
                 ORDER BY duration DESC 
                 LIMIT 10
             `);
+
+            const topArtists = await dbRepo.getTopArtists(10);
+            
+            // Fetch genres for top artists and aggregate them
+            const genreCounts = {};
+            for (const artist of topArtists) {
+                let genres = await dbRepo.getArtistGenres(artist.id);
+                if (!genres) {
+                    try {
+                        const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
+                        genres = artistData.genres || [];
+                        await dbRepo.saveArtistGenres(artist.id, genres);
+                    } catch (e) {
+                        console.error(`Failed to fetch genres for ${artist.id}:`, e);
+                        genres = [];
+                    }
+                }
+                genres.forEach(g => {
+                    genreCounts[g] = (genreCounts[g] || 0) + 1;
+                });
+            }
+
+            const topGenres = Object.entries(genreCounts)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 10);
+
             const activity = await dbRepo.db.all(`
                 SELECT date(started_at/1000, 'unixepoch') as day, SUM(duration_ms) as duration 
                 FROM listening_sessions 
@@ -123,6 +151,8 @@ async function startServer() {
             res.json({
                 totalTime: totalTime?.total || 0,
                 topTracks: topTracks,
+                topArtists: topArtists,
+                topGenres: topGenres,
                 activity: activity
             });
         } catch (e) {

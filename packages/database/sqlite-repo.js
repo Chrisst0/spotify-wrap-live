@@ -52,8 +52,11 @@ class SpotifyDatabase {
             `);
 
             await this.db.exec(`
-                CREATE INDEX IF NOT EXISTS idx_started_at ON listening_sessions(started_at);
-                CREATE INDEX IF NOT EXISTS idx_track_id ON listening_sessions(track_id);
+                CREATE TABLE IF NOT EXISTS artist_genres (
+                    artist_id TEXT PRIMARY KEY,
+                    genres TEXT,
+                    last_updated INTEGER
+                );
             `);
             try {
             // Ensure track_name column exists for old databases
@@ -102,6 +105,32 @@ class SpotifyDatabase {
             console.error(`[DB Debug] Failed to update session ${sessionId}:`, e);
         }
     }
-}
+    async saveArtistGenres(artistId, genres) {
+        try {
+            await this.db.run(
+                `INSERT OR REPLACE INTO artist_genres (artist_id, genres, last_updated) VALUES (?, ?, ?)`,
+                [artistId, JSON.stringify(genres), Date.now()]
+            );
+        } catch (e) {
+            console.error(`[DB Debug] Failed to save genres for ${artistId}:`, e);
+        }
+    }
 
-module.exports = SpotifyDatabase;
+    async getArtistGenres(artistId) {
+        try {
+            const row = await this.db.get(`SELECT genres FROM artist_genres WHERE artist_id = ?`, [artistId]);
+            return row ? JSON.parse(row.genres) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async getTopArtists(limit = 10) {
+        return await this.db.all(`
+            SELECT sa.artist_id as id, SUM(ls.duration_ms) as duration
+            FROM session_artists sa
+            JOIN listening_sessions ls ON sa.session_id = ls.id
+            GROUP BY sa.artist_id
+            ORDER BY duration DESC
+            LIMIT ?`, [limit]);
+    }

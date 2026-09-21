@@ -9,6 +9,7 @@ export default function App() {
   const [stats, setStats] = useState({
     totalTime: 0,
     topTracks: [],
+    topArtists: [],
     activity: [],
     topGenres: []
   });
@@ -162,7 +163,7 @@ export default function App() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <StatCard icon={<Clock className="text-blue-400" />} label="Total Time" value={formatMs(stats.totalTime)} sub="All time" />
         <StatCard icon={<Music className="text-green-400" />} label="Tracks Tracked" value={stats.topTracks.length.toString()} sub="Unique songs" />
-        <StatCard icon={<User className="text-purple-400" />} label="Status" value="Live" sub="Tracking active" />
+        <StatCard icon={<User className="text-purple-400" />} label="Top Artists" value={stats.topArtists.length.toString()} sub="Most played" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -220,23 +221,44 @@ export default function App() {
           </div>
         </div>
 
-        <div className="lg:col-span-3 bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
-          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <Play size={20} className="text-green-500" /> Top Tracks (by Time)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stats.topTracks.map((track, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-zinc-700">
-                <div className="flex items-center gap-4">
-                  <span className="text-zinc-600 font-mono w-4">{i + 1}</span>
-                  <div className="overflow-hidden">
-                    <p className="font-medium truncate">{track.name || `Track ${track.id.substring(0, 8)}...`}</p>
-                    <p className="text-xs text-zinc-500 truncate">ID: {track.id}</p>
+        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <Play size={20} className="text-green-500" /> Top Tracks (by Time)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+              {stats.topTracks.map((track, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-zinc-700">
+                  <div className="flex items-center gap-4">
+                    <span className="text-zinc-600 font-mono w-4">{i + 1}</span>
+                    <div className="overflow-hidden">
+                      <p className="font-medium truncate">{track.name || `Track ${track.id.substring(0, 8)}...`}</p>
+                      <p className="text-xs text-zinc-500 truncate">ID: {track.id}</p>
+                    </div>
                   </div>
+                  <span className="text-zinc-400 text-sm font-mono">{formatMs(track.duration)}</span>
                 </div>
-                <span className="text-zinc-400 text-sm font-mono">{formatMs(track.duration)}</span>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <User size={20} className="text-green-500" /> Top Artists
+            </h3>
+            <div className="grid grid-cols-1 gap-4">
+              {stats.topArtists.map((artist, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-zinc-700">
+                  <div className="flex items-center gap-4">
+                    <span className="text-zinc-600 font-mono w-4">{i + 1}</span>
+                    <div className="overflow-hidden">
+                      <p className="font-medium truncate">Artist ID: {artist.id}</p>
+                    </div>
+                  </div>
+                  <span className="text-zinc-400 text-sm font-mono">{formatMs(artist.duration)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
