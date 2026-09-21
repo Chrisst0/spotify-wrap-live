@@ -61,10 +61,28 @@ class ListeningTracker {
                     lastPositionMs: state.progress_ms,
                     accumulatedDurationMs: 0
                 };
+            } else if (this.currentSession.trackId !== state.track.id) {
+                console.log(`[Tracker Heartbeat] Song changed! Flushing session ${this.currentSession.id}`);
+                await this.flushCurrentSession();
+                
+                console.log(`[Tracker Heartbeat] Starting new session for track ${state.track.id}`);
+                this.currentSession = {
+                    id: crypto.randomUUID(),
+                    trackId: state.track.id,
+                    startedAt: now,
+                    lastObservedAt: now,
+                    lastPositionMs: state.progress_ms,
+                    accumulatedDurationMs: 0
+                };
             } else {
                 const posDelta = state.progress_ms - this.currentSession.lastPositionMs;
                 if (posDelta > 0) {
                     this.currentSession.accumulatedDurationMs += posDelta;
+                } else if (state.progress_ms < this.currentSession.lastPositionMs) {
+                    // Track restarted or looped
+                    const trackDuration = state.track.duration_ms;
+                    const loopDuration = (trackDuration - this.currentSession.lastPositionMs) + state.progress_ms;
+                    this.currentSession.accumulatedDurationMs += loopDuration;
                 }
                 this.currentSession.lastObservedAt = now;
                 this.currentSession.lastPositionMs = state.progress_ms;
