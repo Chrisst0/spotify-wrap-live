@@ -176,8 +176,13 @@ async function startServer() {
             // Fetch names, genres, and images for top artists in parallel, creating fresh objects
             const topArtists = await Promise.all(rawTopArtists.map(async (artist) => {
                 let info = await dbRepo.getArtistInfo(artist.id);
+                
+                // DEBUG: Log cache status
+                console.log(`[Artist Debug] Checking ${artist.id}: ${info ? 'Cache Hit' : 'Cache Miss'}`);
+
                 if (!info || info.name === 'Unknown Artist') {
                     try {
+                        console.log(`[Artist Debug] Fetching ${artist.id} from Spotify...`);
                         const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
                         info = { 
                             name: artistData.name, 
@@ -185,8 +190,9 @@ async function startServer() {
                             image: artistData.images?.[0]?.url || null
                         };
                         await dbRepo.saveArtistInfo(artist.id, info.name, info.genres, info.image);
+                        console.log(`[Artist Debug] Successfully cached ${artist.id}`);
                     } catch (e) {
-                        console.error(`Failed to fetch info for ${artist.id}:`, e);
+                        console.error(`[Artist Debug] API Failure for ${artist.id}:`, e);
                         info = info || { name: `Unknown Artist`, genres: [], image: null };
                     }
                 }
