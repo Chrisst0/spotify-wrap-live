@@ -134,3 +134,6 @@ class SpotifyDatabase {
             ORDER BY duration DESC
             LIMIT ?`, [limit]);
     }
+}
+
+module.exports = SpotifyDatabase;
