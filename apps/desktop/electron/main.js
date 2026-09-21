@@ -31,9 +31,7 @@ async function createWindow() {
         },
     });
 
-    const startUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5173' 
-        : `file://${path.join(__dirname, '../renderer/dist/index.html')}`;
+    const startUrl = 'http://localhost:5173';
 
     mainWindow.loadURL(startUrl);
 }
@@ -63,6 +61,18 @@ ipcMain.handle('auth:status', async () => {
         console.error('Auth status check failed:', error);
         return false;
     }
+});
+
+ipcMain.handle('auth:getAccessToken', async () => {
+    return await storage.getToken('access_token');
+});
+
+ipcMain.handle('auth:getTokenExpiration', async () => {
+    return await storage.getToken('expires_at');
+});
+
+ipcMain.handle('auth:getRefreshToken', async () => {
+    return await storage.getToken('refresh_token');
 });
 
 ipcMain.handle('stats:getSummary', async () => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Play, BarChart3, User, Music, Clock, LogOut, RefreshCw } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Play, BarChart3, User, Music, Clock, LogOut, RefreshCw, Cloud, PieChart } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -9,12 +9,17 @@ export default function App() {
   const [stats, setStats] = useState({
     totalTime: 0,
     topTracks: [],
-    activity: []
+    activity: [],
+    topGenres: []
   });
+
+  // CHANGE THIS to your Oracle IP!
+  const CLOUD_API_URL = 'http://92.4.165.12:3000'; 
 
   const fetchStats = async () => {
     try {
-      const data = await (window as any).electronAPI.getStats();
+      const response = await fetch(`${CLOUD_API_URL}/stats`);
+      const data = await response.json();
       setStats(data);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (e) {
@@ -45,6 +50,32 @@ export default function App() {
       return () => clearInterval(interval);
     }
   }, [isAuthenticated]);
+
+  const syncTokenToCloud = async () => {
+    try {
+      const token = await (window as any).electronAPI.getAccessToken();
+      const expiresAt = await (window as any).electronAPI.getTokenExpiration();
+      const refreshToken = await (window as any).electronAPI.getRefreshToken();
+      
+      const response = await fetch(`${CLOUD_API_URL}/sync-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          access_token: token, 
+          refresh_token: refreshToken, 
+          expires_at: expiresAt 
+        })
+      });
+      
+      if (response.ok) {
+        alert('Cloud Sync Successful! Your server is now tracking 24/7.');
+      } else {
+        alert('Sync failed. Check server logs.');
+      }
+    } catch (e) {
+      alert('Error syncing token: ' + e);
+    }
+  };
 
   const handleSignIn = async () => {
     setLoading(true);
@@ -96,22 +127,32 @@ export default function App() {
     return `${seconds}s`;
   };
 
+  const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#ef4444', '#f59e0b', '#ec4899'];
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8 font-sans">
       <header className="flex justify-between items-center mb-12">
-        <div>
-          <h1 className="text-3xl font-black tracking-tighter flex items-center gap-2">
-            <Music className="text-green-500" /> Spotify Live Wrap
-          </h1>
-          <div className="flex items-center gap-2 text-zinc-500">
-            <p>Real-time listening insights</p>
-            {lastUpdated && (
-              <span className="flex items-center gap-1 text-xs bg-zinc-900 px-2 py-1 rounded-md border border-zinc-800">
-                <RefreshCw size={10} className="animate-spin-slow" />
-                Last update: {lastUpdated}
-              </span>
-            )}
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-3xl font-black tracking-tighter flex items-center gap-2">
+              <Music className="text-green-500" /> Spotify Live Wrap
+            </h1>
+            <div className="flex items-center gap-2 text-zinc-500">
+              <p>Real-time listening insights</p>
+              {lastUpdated && (
+                <span className="flex items-center gap-1 text-xs bg-zinc-900 px-2 py-1 rounded-md border border-zinc-800">
+                  <RefreshCw size={10} className="animate-spin-slow" />
+                  Last update: {lastUpdated}
+                </span>
+              )}
+            </div>
           </div>
+          <button 
+            onClick={syncTokenToCloud}
+            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold py-2 px-4 rounded-full transition-all border border-zinc-700"
+          >
+            <Cloud size={14} /> Sync to Cloud
+          </button>
         </div>
         <button className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
           <LogOut size={20} /> Sign Out
@@ -124,8 +165,8 @@ export default function App() {
         <StatCard icon={<User className="text-purple-400" />} label="Status" value="Live" sub="Tracking active" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
           <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
             <BarChart3 size={20} className="text-green-500" /> Listening Activity
           </h3>
@@ -143,11 +184,49 @@ export default function App() {
 
         <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
           <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+            <PieChart size={20} className="text-green-500" /> Top Genres
+          </h3>
+          <div className="h-64 w-full flex flex-col items-center justify-center">
+            {stats.topGenres && stats.topGenres.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <RechartsPieChart>
+                    <Pie 
+                      data={stats.topGenres} 
+                      innerRadius={60} 
+                      outerRadius={80} 
+                      paddingAngle={5} 
+                      dataKey="value"
+                    >
+                      {stats.topGenres.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 grid grid-cols-2 gap-2 w-full">
+                  {stats.topGenres.map((genre, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                      <span className="text-zinc-400 truncate">{genre.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-zinc-500 text-sm italic">Collecting genre data...</p>
+            )}
+          </div>
+        </div>
+
+        <div className="lg:col-span-3 bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
+          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
             <Play size={20} className="text-green-500" /> Top Tracks (by Time)
           </h3>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {stats.topTracks.map((track, i) => (
-              <div key={i} className="flex items-center justify-between p-3 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer">
+              <div key={i} className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-zinc-700">
                 <div className="flex items-center gap-4">
                   <span className="text-zinc-600 font-mono w-4">{i + 1}</span>
                   <div className="overflow-hidden">

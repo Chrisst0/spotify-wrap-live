@@ -40,16 +40,64 @@ const spotifyClient = new SpotifyClient();
 async function startServer() {
     await dbRepo.init();
     
-    // Corrected constructor: (client, db, storage)
+    // Create a basic auth handler for the server to auto-refresh tokens
+    const refreshAccessToken = async () => {
+        const refreshToken = await cloudStorage.getToken('refresh_token');
+        const clientId = process.env.SPOTIFY_CLIENT_ID || '';
+        
+        if (!refreshToken || !clientId) {
+            console.error('[Auth Error] Missing refresh_token or client_id on server');
+            return null;
+        }
+
+        try {
+            const response = await fetch('https://accounts.spotify.com/api/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    grant_type: 'refresh_token',
+                    refresh_token: refreshToken,
+                    client_id: clientId,
+                }),
+            });
+
+            if (!response.ok) throw new Error(`Refresh failed: ${await response.text()}`);
+            const data = await response.json();
+            
+            await cloudStorage.setToken('access_token', data.access_token);
+            await cloudStorage.setToken('expires_at', (Date.now() + data.expires_in * 1000).toString());
+            
+            console.log('[Auth] Token refreshed successfully');
+            return data.access_token;
+        } catch (e) {
+            console.error('[Auth] Token refresh failed:', e);
+            return null;
+        }
+    };
+
+    // Override tracker's token retrieval to use the refresh logic
+    const originalGetToken = cloudStorage.getToken.bind(cloudStorage);
+    cloudStorage.getToken = async (key) => {
+        if (key === 'access_token') {
+            const expiresAt = await originalGetToken('expires_at');
+            if (!expiresAt || Date.now() > parseInt(expiresAt)) {
+                console.log('[Auth] Token expired, attempting auto-refresh...');
+                return await refreshAccessToken();
+            }
+        }
+        return originalGetToken(key);
+    };
+
     const tracker = new ListeningTracker(spotifyClient, dbRepo, cloudStorage);
     tracker.start();
     console.log('[Cloud Server] Listening Tracker started in background...');
 
     app.post('/sync-token', async (req, res) => {
-        const { access_token, expires_at } = req.body;
+        const { access_token, refresh_token, expires_at } = req.body;
         if (!access_token) return res.status(400).json({ error: 'Missing token' });
         
         await cloudStorage.setToken('access_token', access_token);
+        await cloudStorage.setToken('refresh_token', refresh_token);
         await cloudStorage.setToken('expires_at', expires_at);
         
         res.json({ status: 'Token synced successfully' });
