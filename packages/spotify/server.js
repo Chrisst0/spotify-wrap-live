@@ -169,14 +169,18 @@ async function startServer() {
                 let info = await dbRepo.getTrackInfo(track.id);
                 if (!info) {
                     try {
-                        const trackData = await spotifyClient.request(`/tracks/${track.id}`, await cloudStorage.getToken('access_token'));
+                        // Use a timeout to prevent the entire request from hanging on rate limits
+                        const trackData = await Promise.race([
+                            spotifyClient.request(`/tracks/${track.id}`, await cloudStorage.getToken('access_token')),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                        ]);
                         info = { 
                             name: trackData.name, 
                             image: trackData.album.images?.[0]?.url || null 
                         };
                         await dbRepo.saveTrackInfo(track.id, info.name, info.image);
                     } catch (e) {
-                        console.error(`Failed to fetch image for track ${track.id}:`, e);
+                        console.error(`Failed to fetch image for track ${track.id} (Timeout or API Error):`, e.message);
                         info = { name: track.name, image: null };
                     }
                 }
@@ -200,7 +204,11 @@ async function startServer() {
                 if (!info || info.name === 'Unknown Artist') {
                     try {
                         console.log(`[Artist Debug] Fetching ${artist.id} from Spotify...`);
-                        const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
+                        // Use a timeout to prevent the entire request from hanging on rate limits
+                        const artistData = await Promise.race([
+                            spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token')),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                        ]);
                         info = { 
                             name: artistData.name, 
                             genres: artistData.genres || [],
@@ -209,7 +217,7 @@ async function startServer() {
                         await dbRepo.saveArtistInfo(artist.id, info.name, info.genres, info.image);
                         console.log(`[Artist Debug] Successfully cached ${artist.id}`);
                     } catch (e) {
-                        console.error(`[Artist Debug] API Failure for ${artist.id}:`, e);
+                        console.error(`[Artist Debug] API Failure or Timeout for ${artist.id}:`, e.message);
                         info = info || { name: `Unknown Artist`, genres: [], image: null };
                     }
                 }
