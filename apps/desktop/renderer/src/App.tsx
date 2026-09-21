@@ -8,6 +8,8 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalTime: 0,
+    totalTracks: 0,
+    totalArtists: 0,
     topTracks: [],
     topArtists: [],
     activity: [],
@@ -162,8 +164,8 @@ export default function App() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <StatCard icon={<Clock className="text-blue-400" />} label="Total Time" value={formatMs(stats.totalTime)} sub="All time" />
-        <StatCard icon={<Music className="text-green-400" />} label="Tracks Tracked" value={(stats.topTracks?.length || 0).toString()} sub="Unique songs" />
-        <StatCard icon={<User className="text-purple-400" />} label="Top Artists" value={(stats.topArtists?.length || 0).toString()} sub="Most played" />
+        <StatCard icon={<Music className="text-green-400" />} label="Tracks Tracked" value={stats.totalTracks.toString()} sub="Unique songs" />
+        <StatCard icon={<User className="text-purple-400" />} label="Top Artists" value={stats.totalArtists.toString()} sub="Most played" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

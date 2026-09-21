@@ -107,6 +107,9 @@ async function startServer() {
         try {
             const totalTime = await dbRepo.db.get('SELECT SUM(duration_ms) as total FROM listening_sessions');
             
+            const totalTracks = await dbRepo.db.get('SELECT COUNT(DISTINCT track_id) as count FROM listening_sessions');
+            const totalArtists = await dbRepo.db.get('SELECT COUNT(DISTINCT artist_id) as count FROM session_artists');
+
             const topTracks = await dbRepo.db.all(`
                 SELECT track_id as id, track_name as name, SUM(duration_ms) as duration 
                 FROM listening_sessions 
@@ -162,6 +165,8 @@ async function startServer() {
 
             res.json({
                 totalTime: totalTime?.total || 0,
+                totalTracks: totalTracks?.count || 0,
+                totalArtists: totalArtists?.count || 0,
                 topTracks: topTracks,
                 topArtists: artistsWithNames,
                 topGenres: topGenres,
