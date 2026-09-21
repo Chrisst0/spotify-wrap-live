@@ -147,16 +147,24 @@ async function startServer() {
                 LIMIT 10
             `);
 
-            // Fetch album art for top tracks
-            for (const track of topTracks) {
-                try {
-                    const trackData = await spotifyClient.request(`/tracks/${track.id}`, await cloudStorage.getToken('access_token'));
-                    track.image = trackData.album.images?.[0]?.url || null;
-                } catch (e) {
-                    console.error(`Failed to fetch image for track ${track.id}:`, e);
-                    track.image = null;
+            // Fetch and cache album art for top tracks in parallel
+            await Promise.all(topTracks.map(async (track) => {
+                let info = await dbRepo.getTrackInfo(track.id);
+                if (!info) {
+                    try {
+                        const trackData = await spotifyClient.request(`/tracks/${track.id}`, await cloudStorage.getToken('access_token'));
+                        info = { 
+                            name: trackData.name, 
+                            image: trackData.album.images?.[0]?.url || null 
+                        };
+                        await dbRepo.saveTrackInfo(track.id, info.name, info.image);
+                    } catch (e) {
+                        console.error(`Failed to fetch image for track ${track.id}:`, e);
+                        info = { name: track.name, image: null };
+                    }
                 }
-            }
+                track.image = info.image;
+            }));
 
             const topArtists = await dbRepo.getTopArtists(10);
             

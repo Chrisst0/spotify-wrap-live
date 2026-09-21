@@ -60,6 +60,15 @@ class SpotifyDatabase {
                     last_updated INTEGER
                 );
             `);
+
+            await this.db.exec(`
+                CREATE TABLE IF NOT EXISTS track_info (
+                    track_id TEXT PRIMARY KEY,
+                    name TEXT,
+                    image_url TEXT,
+                    last_updated INTEGER
+                );
+            `);
             try {
             // Ensure track_name column exists for old databases
             await this.db.exec(`ALTER TABLE listening_sessions ADD COLUMN track_name TEXT;`);
@@ -118,10 +127,30 @@ class SpotifyDatabase {
         }
     }
 
+    async saveTrackInfo(trackId, name, imageUrl) {
+        try {
+            await this.db.run(
+                `INSERT OR REPLACE INTO track_info (track_id, name, image_url, last_updated) VALUES (?, ?, ?, ?)`,
+                [trackId, name, imageUrl, Date.now()]
+            );
+        } catch (e) {
+            console.error(`[DB Debug] Failed to save track info for ${trackId}:`, e);
+        }
+    }
+
     async getArtistInfo(artistId) {
         try {
             const row = await this.db.get(`SELECT name, genres, image_url FROM artist_info WHERE artist_id = ?`, [artistId]);
             return row ? { name: row.name, genres: JSON.parse(row.genres), image: row.image_url } : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async getTrackInfo(trackId) {
+        try {
+            const row = await this.db.get(`SELECT name, image_url FROM track_info WHERE track_id = ?`, [trackId]);
+            return row ? { name: row.name, image: row.image_url } : null;
         } catch (e) {
             return null;
         }
