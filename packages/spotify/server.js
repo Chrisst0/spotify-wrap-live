@@ -117,21 +117,33 @@ async function startServer() {
 
             const topArtists = await dbRepo.getTopArtists(10);
             
-            // Fetch genres for top artists and aggregate them
+            // Fetch names and genres for top artists and aggregate them
             const genreCounts = {};
+            const artistsWithNames = [];
+
             for (const artist of topArtists) {
-                let genres = await dbRepo.getArtistGenres(artist.id);
-                if (!genres) {
+                let info = await dbRepo.getArtistInfo(artist.id);
+                if (!info) {
                     try {
                         const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
-                        genres = artistData.genres || [];
-                        await dbRepo.saveArtistGenres(artist.id, genres);
+                        info = { 
+                            name: artistData.name, 
+                            genres: artistData.genres || [] 
+                        };
+                        await dbRepo.saveArtistInfo(artist.id, info.name, info.genres);
                     } catch (e) {
-                        console.error(`Failed to fetch genres for ${artist.id}:`, e);
-                        genres = [];
+                        console.error(`Failed to fetch info for ${artist.id}:`, e);
+                        info = { name: `Unknown Artist`, genres: [] };
                     }
                 }
-                genres.forEach(g => {
+                
+                artistsWithNames.push({
+                    id: artist.id,
+                    name: info.name,
+                    duration: artist.duration
+                });
+
+                info.genres.forEach(g => {
                     genreCounts[g] = (genreCounts[g] || 0) + 1;
                 });
             }
@@ -151,7 +163,7 @@ async function startServer() {
             res.json({
                 totalTime: totalTime?.total || 0,
                 topTracks: topTracks,
-                topArtists: topArtists,
+                topArtists: artistsWithNames,
                 topGenres: topGenres,
                 activity: activity
             });
