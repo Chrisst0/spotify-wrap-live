@@ -175,30 +175,32 @@ async function startServer() {
             for (const artist of topArtists) {
                 let info = await dbRepo.getArtistInfo(artist.id);
                 
-                // If info is missing or name is "Unknown Artist", try to refresh from Spotify
+                // Trigger background refresh if info is missing or stale
                 if (!info || info.name === 'Unknown Artist') {
-                    try {
-                        const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
-                        info = { 
-                            name: artistData.name, 
-                            genres: artistData.genres || [],
-                            image: artistData.images?.[0]?.url || null
-                        };
-                        await dbRepo.saveArtistInfo(artist.id, info.name, info.genres, info.image);
-                    } catch (e) {
-                        console.error(`Failed to refresh info for ${artist.id}:`, e);
-                        info = info || { name: `Unknown Artist`, genres: [], image: null };
-                    }
+                    // We DON'T 'await' this here to avoid blocking the API response
+                    (async () => {
+                        try {
+                            const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
+                            const refreshedInfo = { 
+                                name: artistData.name, 
+                                genres: artistData.genres || [],
+                                image: artistData.images?.[0]?.url || null
+                            };
+                            await dbRepo.saveArtistInfo(artist.id, refreshedInfo.name, refreshedInfo.genres, refreshedInfo.image);
+                        } catch (e) {
+                            console.error(`Background refresh failed for ${artist.id}:`, e);
+                        }
+                    })();
                 }
                 
                 artistsWithNames.push({
                     id: artist.id,
-                    name: info.name,
-                    image: info.image,
+                    name: info?.name || `Loading...`,
+                    image: info?.image || null,
                     duration: artist.duration
                 });
 
-                if (info.genres) {
+                if (info?.genres) {
                     info.genres.forEach(g => {
                         genreCounts[g] = (genreCounts[g] || 0) + 1;
                     });
