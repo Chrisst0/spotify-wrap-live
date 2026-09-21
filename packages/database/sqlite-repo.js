@@ -52,8 +52,9 @@ class SpotifyDatabase {
             `);
 
             await this.db.exec(`
-                CREATE TABLE IF NOT EXISTS artist_genres (
+                CREATE TABLE IF NOT EXISTS artist_info (
                     artist_id TEXT PRIMARY KEY,
+                    name TEXT,
                     genres TEXT,
                     last_updated INTEGER
                 );
@@ -105,21 +106,21 @@ class SpotifyDatabase {
             console.error(`[DB Debug] Failed to update session ${sessionId}:`, e);
         }
     }
-    async saveArtistGenres(artistId, genres) {
+    async saveArtistInfo(artistId, name, genres) {
         try {
             await this.db.run(
-                `INSERT OR REPLACE INTO artist_genres (artist_id, genres, last_updated) VALUES (?, ?, ?)`,
-                [artistId, JSON.stringify(genres), Date.now()]
+                `INSERT OR REPLACE INTO artist_info (artist_id, name, genres, last_updated) VALUES (?, ?, ?, ?)`,
+                [artistId, name, JSON.stringify(genres), Date.now()]
             );
         } catch (e) {
-            console.error(`[DB Debug] Failed to save genres for ${artistId}:`, e);
+            console.error(`[DB Debug] Failed to save info for ${artistId}:`, e);
         }
     }
 
-    async getArtistGenres(artistId) {
+    async getArtistInfo(artistId) {
         try {
-            const row = await this.db.get(`SELECT genres FROM artist_genres WHERE artist_id = ?`, [artistId]);
-            return row ? JSON.parse(row.genres) : null;
+            const row = await this.db.get(`SELECT name, genres FROM artist_info WHERE artist_id = ?`, [artistId]);
+            return row ? { name: row.name, genres: JSON.parse(row.genres) } : null;
         } catch (e) {
             return null;
         }
