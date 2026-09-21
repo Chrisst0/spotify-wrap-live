@@ -61,6 +61,42 @@ class ListeningTracker {
                     lastPositionMs: state.progress_ms,
                     accumulatedDurationMs: 0
                 };
+
+                // IMMEDIATELY create the session record in DB so that updateSessionDuration works
+                try {
+                    const token = await this.storage.getToken('access_token');
+                    let trackData = null;
+                    if (token) {
+                        try {
+                            trackData = await this.client.request(`/tracks/${this.currentSession.trackId}`, token);
+                        } catch (e) {
+                            console.error(`Could not fetch track data for initial session ${this.currentSession.trackId}`);
+                        }
+                    }
+                    const trackName = trackData ? `${trackData.name} - ${trackData.artists[0]?.name || 'Unknown Artist'}` : 'Unknown Track';
+                    const artistIds = trackData ? trackData.artists.map(a => a.id) : [];
+                    const albumId = trackData ? trackData.album.id : null;
+
+                    await this.db.saveSession({
+                        id: this.currentSession.id,
+                        trackId: this.currentSession.trackId,
+                        trackName: trackName,
+                        albumId: albumId,
+                        startedAt: this.currentSession.startedAt,
+                        endedAt: null,
+                        listenedDurationMs: 0,
+                        startPositionMs: 0,
+                        endPositionMs: null,
+                        deviceId: null,
+                        deviceName: null,
+                        contextType: null,
+                        contextUri: null,
+                        createdAt: Date.now(),
+                    }, artistIds);
+                    console.log(`[DB Debug] Initial session record created for ${this.currentSession.id}`);
+                } catch (e) {
+                    console.error(`[DB Debug] Failed to create initial session record:`, e);
+                }
             } else if (this.currentSession.trackId !== state.track.id) {
                 console.log(`[Tracker Heartbeat] Song changed! Flushing session ${this.currentSession.id}`);
                 await this.flushCurrentSession();
@@ -117,39 +153,16 @@ class ListeningTracker {
         this.currentSession = null;
 
         try {
-            const token = await this.storage.getToken('access_token');
-            if (!token) return;
-                
-            let trackData = null;
-            try {
-                trackData = await this.client.request(`/tracks/${session.trackId}`, token);
-            } catch (e) {
-                console.error(`Could not fetch track data for ${session.trackId}, using fallback.`);
-            }
-
-            const trackName = trackData ? `${trackData.name} - ${trackData.artists[0]?.name || 'Unknown Artist'}` : 'Unknown Track';
-
-            const dbSession = {
-                id: session.id,
-                trackId: session.trackId,
-                trackName: trackName,
-                artistIds: trackData ? trackData.artists.map(a => a.id) : [],
-                albumId: trackData ? trackData.album.id : null,
-                startedAt: session.startedAt,
-                endedAt: Date.now(),
-                listenedDurationMs: session.accumulatedDurationMs,
-                startPositionMs: 0, 
-                endPositionMs: null,
-                deviceId: null,
-                deviceName: null,
-                contextType: null,
-                contextUri: null,
-                createdAt: Date.now(),
-            };
-
-            await this.db.saveSession(dbSession, dbSession.artistIds);
+            // Update the final duration and end time rather than inserting a new record
+            await this.db.updateSessionDuration(
+                session.id, 
+                session.accumulatedDurationMs, 
+                session.lastPositionMs, 
+                Date.now()
+            );
+            console.log(`[DB Debug] Session ${session.id} finalized with duration ${session.accumulatedDurationMs}ms`);
         } catch (error) {
-            console.error('Error flushing session to DB:', error);
+            console.error('Error finalizing session in DB:', error);
         }
     }
 }
