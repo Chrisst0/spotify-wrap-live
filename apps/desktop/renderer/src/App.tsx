@@ -15,6 +15,12 @@ export default function App() {
     activity: [],
     topGenres: []
   });
+  const [currentTrack, setCurrentTrack] = useState<{
+    name: string;
+    artist: string;
+    albumArt: string;
+    isPlaying: boolean;
+  } | null>(null);
 
   // CHANGE THIS to your Oracle IP!
   const CLOUD_API_URL = 'http://92.4.165.12:3000'; 
@@ -30,6 +36,25 @@ export default function App() {
     }
   };
 
+  const fetchCurrentTrack = async () => {
+    try {
+      const response = await fetch(`${CLOUD_API_URL}/current`);
+      const data = await response.json();
+      if (data.isPlaying && data.track) {
+        setCurrentTrack({
+          name: data.track.name,
+          artist: data.track.artist,
+          albumArt: data.track.albumArt,
+          isPlaying: true
+        });
+      } else {
+        setCurrentTrack(null);
+      }
+    } catch (e) {
+      console.error('Failed to fetch current track:', e);
+    }
+  };
+
   useEffect(() => {
     async function init() {
       try {
@@ -37,6 +62,7 @@ export default function App() {
         setIsAuthenticated(status);
         if (status) {
           await fetchStats();
+          await fetchCurrentTrack();
         }
       } catch (e) {
         console.error('Init failed:', e);
@@ -49,8 +75,12 @@ export default function App() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const interval = setInterval(fetchStats, 5000);
-      return () => clearInterval(interval);
+      const statsInterval = setInterval(fetchStats, 5000);
+      const trackInterval = setInterval(fetchCurrentTrack, 3000);
+      return () => {
+        clearInterval(statsInterval);
+        clearInterval(trackInterval);
+      };
     }
   }, [isAuthenticated]);
 

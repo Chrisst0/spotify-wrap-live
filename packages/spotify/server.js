@@ -103,6 +103,35 @@ async function startServer() {
         res.json({ status: 'Token synced successfully' });
     });
 
+    app.get('/current', async (req, res) => {
+        try {
+            const token = await cloudStorage.getToken('access_token');
+            if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+            const state = await spotifyClient.getCurrentPlayback(token);
+            if (!state.track) {
+                return res.json({ isPlaying: false });
+            }
+
+            const trackData = await spotifyClient.request(`/tracks/${state.track.id}`, token);
+            
+            res.json({
+                isPlaying: state.isPlaying,
+                track: {
+                    id: state.track.id,
+                    name: trackData.name,
+                    artist: trackData.artists[0]?.name,
+                    albumArt: trackData.album.images?.[0]?.url,
+                    progress_ms: state.progress_ms,
+                    duration_ms: state.track.duration_ms
+                }
+            });
+        } catch (e) {
+            console.error('[API Error] /current:', e);
+            res.status(500).json({ error: 'Failed to fetch current track' });
+        }
+    });
+
     app.get('/stats', async (req, res) => {
         try {
             const totalTime = await dbRepo.db.get('SELECT SUM(duration_ms) as total FROM listening_sessions');
