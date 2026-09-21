@@ -118,6 +118,17 @@ async function startServer() {
                 LIMIT 10
             `);
 
+            // Fetch album art for top tracks
+            for (const track of topTracks) {
+                try {
+                    const trackData = await spotifyClient.request(`/tracks/${track.id}`, await cloudStorage.getToken('access_token'));
+                    track.image = trackData.album.images?.[0]?.url || null;
+                } catch (e) {
+                    console.error(`Failed to fetch image for track ${track.id}:`, e);
+                    track.image = null;
+                }
+            }
+
             const topArtists = await dbRepo.getTopArtists(10);
             
             // Fetch names and genres for top artists and aggregate them
@@ -131,18 +142,20 @@ async function startServer() {
                         const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
                         info = { 
                             name: artistData.name, 
-                            genres: artistData.genres || [] 
+                            genres: artistData.genres || [],
+                            image: artistData.images?.[0]?.url || null
                         };
-                        await dbRepo.saveArtistInfo(artist.id, info.name, info.genres);
+                        await dbRepo.saveArtistInfo(artist.id, info.name, info.genres, info.image);
                     } catch (e) {
                         console.error(`Failed to fetch info for ${artist.id}:`, e);
-                        info = { name: `Unknown Artist`, genres: [] };
+                        info = { name: `Unknown Artist`, genres: [], image: null };
                     }
                 }
                 
                 artistsWithNames.push({
                     id: artist.id,
                     name: info.name,
+                    image: info.image,
                     duration: artist.duration
                 });
 

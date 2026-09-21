@@ -56,6 +56,7 @@ class SpotifyDatabase {
                     artist_id TEXT PRIMARY KEY,
                     name TEXT,
                     genres TEXT,
+                    image_url TEXT,
                     last_updated INTEGER
                 );
             `);
@@ -106,11 +107,11 @@ class SpotifyDatabase {
             console.error(`[DB Debug] Failed to update session ${sessionId}:`, e);
         }
     }
-    async saveArtistInfo(artistId, name, genres) {
+    async saveArtistInfo(artistId, name, genres, imageUrl) {
         try {
             await this.db.run(
-                `INSERT OR REPLACE INTO artist_info (artist_id, name, genres, last_updated) VALUES (?, ?, ?, ?)`,
-                [artistId, name, JSON.stringify(genres), Date.now()]
+                `INSERT OR REPLACE INTO artist_info (artist_id, name, genres, image_url, last_updated) VALUES (?, ?, ?, ?, ?)`,
+                [artistId, name, JSON.stringify(genres), imageUrl, Date.now()]
             );
         } catch (e) {
             console.error(`[DB Debug] Failed to save info for ${artistId}:`, e);
@@ -119,8 +120,8 @@ class SpotifyDatabase {
 
     async getArtistInfo(artistId) {
         try {
-            const row = await this.db.get(`SELECT name, genres FROM artist_info WHERE artist_id = ?`, [artistId]);
-            return row ? { name: row.name, genres: JSON.parse(row.genres) } : null;
+            const row = await this.db.get(`SELECT name, genres, image_url FROM artist_info WHERE artist_id = ?`, [artistId]);
+            return row ? { name: row.name, genres: JSON.parse(row.genres), image: row.image_url } : null;
         } catch (e) {
             return null;
         }

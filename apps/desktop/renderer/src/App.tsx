@@ -235,7 +235,7 @@ export default function App() {
               {stats.topTracks.map((track, i) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-zinc-700">
                   <div className="flex items-center gap-4">
-                    <span className="text-zinc-600 font-mono w-4">{i + 1}</span>
+                    <img src={track.image || 'https://via.placeholder.com/48'} className="w-12 h-12 rounded-lg object-cover bg-zinc-700" alt="Album Art" />
                     <div className="overflow-hidden">
                       <p className="font-medium truncate">{track.name || `Track ${track.id.substring(0, 8)}...`}</p>
                       <p className="text-xs text-zinc-500 truncate">ID: {track.id}</p>
@@ -255,7 +255,7 @@ export default function App() {
               {stats.topArtists?.map((artist, i) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-zinc-700">
                   <div className="flex items-center gap-4">
-                    <span className="text-zinc-600 font-mono w-4">{i + 1}</span>
+                    <img src={artist.image || 'https://via.placeholder.com/48'} className="w-12 h-12 rounded-full object-cover bg-zinc-700" alt="Artist Art" />
                     <div className="overflow-hidden">
                       <p className="font-medium truncate">{artist.name || `Unknown Artist (${artist.id.substring(0, 8)})`}</p>
                     </div>
