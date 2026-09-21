@@ -168,40 +168,42 @@ async function startServer() {
 
             const topArtists = await dbRepo.getTopArtists(10);
             
-            // Fetch names and genres for top artists and aggregate them
+            // Fetch names, genres, and images for top artists in parallel
+            await Promise.all(topArtists.map(async (artist) => {
+                let info = await dbRepo.getArtistInfo(artist.id);
+                if (!info || info.name === 'Unknown Artist') {
+                    try {
+                        const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
+                        info = { 
+                            name: artistData.name, 
+                            genres: artistData.genres || [],
+                            image: artistData.images?.[0]?.url || null
+                        };
+                        await dbRepo.saveArtistInfo(artist.id, info.name, info.genres, info.image);
+                    } catch (e) {
+                        console.error(`Failed to fetch info for ${artist.id}:`, e);
+                        info = info || { name: `Unknown Artist`, genres: [], image: null };
+                    }
+                }
+                artist.name = info.name;
+                artist.image = info.image;
+                artist.genres = info.genres;
+            }));
+
+            // Aggregate genres and prepare final artist list
             const genreCounts = {};
             const artistsWithNames = [];
 
             for (const artist of topArtists) {
-                let info = await dbRepo.getArtistInfo(artist.id);
-                
-                // Trigger background refresh if info is missing or stale
-                if (!info || info.name === 'Unknown Artist') {
-                    // We DON'T 'await' this here to avoid blocking the API response
-                    (async () => {
-                        try {
-                            const artistData = await spotifyClient.request(`/artists/${artist.id}`, await cloudStorage.getToken('access_token'));
-                            const refreshedInfo = { 
-                                name: artistData.name, 
-                                genres: artistData.genres || [],
-                                image: artistData.images?.[0]?.url || null
-                            };
-                            await dbRepo.saveArtistInfo(artist.id, refreshedInfo.name, refreshedInfo.genres, refreshedInfo.image);
-                        } catch (e) {
-                            console.error(`Background refresh failed for ${artist.id}:`, e);
-                        }
-                    })();
-                }
-                
                 artistsWithNames.push({
                     id: artist.id,
-                    name: info?.name || `Loading...`,
-                    image: info?.image || null,
+                    name: artist.name,
+                    image: artist.image,
                     duration: artist.duration
                 });
 
-                if (info?.genres) {
-                    info.genres.forEach(g => {
+                if (artist.genres) {
+                    artist.genres.forEach(g => {
                         genreCounts[g] = (genreCounts[g] || 0) + 1;
                     });
                 }
