@@ -61,8 +61,9 @@ export default function App() {
         const status = await (window as any).electronAPI.checkAuth();
         setIsAuthenticated(status);
         if (status) {
-          await fetchStats();
-          await fetchCurrentTrack();
+          // Don't await these; let them load in background so UI isn't blocked
+          fetchStats();
+          fetchCurrentTrack();
         }
       } catch (e) {
         console.error('Init failed:', e);

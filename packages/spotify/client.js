@@ -15,12 +15,6 @@
             });
 
             if (!response.ok) {
-                if (response.status === 429) {
-                    const retryAfter = response.headers.get('Retry-After') || 2;
-                    console.warn(`[SpotifyClient] Rate limited (429). Retrying after ${retryAfter}s...`);
-                    await new Promise(res => setTimeout(res, retryAfter * 1000));
-                    return this.request(endpoint, token, options);
-                }
                 const error = await response.text();
                 throw new Error(`Spotify API Error (${response.status}): ${error}`);
             }
