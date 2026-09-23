@@ -222,17 +222,22 @@ export default function App() {
     ];
 
     useEffect(() => {
-      const interval = setInterval(() => {
+      const timer = setInterval(() => {
         setProgress(prev => {
-          if (prev >= 100) {
-            setCurrentStoryIndex(idx => (idx < stories.length - 1 ? idx + 1 : 0));
-            return 0;
-          }
+          if (prev >= 100) return 100;
+          // Calculate increment based on current duration to be precise
           return prev + (100 / (STORY_DURATION / 100));
         });
       }, 100);
 
-      return () => clearInterval(interval);
+      const autoAdvance = setTimeout(() => {
+        setCurrentStoryIndex(idx => (idx < stories.length - 1 ? idx + 1 : 0));
+      }, STORY_DURATION);
+
+      return () => {
+        clearInterval(timer);
+        clearTimeout(autoAdvance);
+      };
     }, [currentStoryIndex]);
 
     // Reset progress when story changes
